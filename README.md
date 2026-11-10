@@ -67,4 +67,4 @@ GITHUB_TOKEN=<token> python3 scripts/sonarcloud_keepalive.py --org wcm-io --repo
 Note on scheduled workflows
 ---------------------------
 
-GitHub disables scheduled workflows in public repositories with no repository activity for 60 days, and sends a notification beforehand. Renovate keeps this repository's action versions up to date, so merging its pull requests also keeps the repository active. If the workflow gets disabled anyway, re-enable it in the "Actions" tab.
+GitHub disables scheduled workflows in public repositories with no repository activity for 60 days, and sends a notification beforehand. Renovate keeps this repository's action versions up to date and automerges non-major updates (see [renovate.json](.github/renovate.json)), which usually keeps the repository active without manual work. If the workflow gets disabled anyway, re-enable it in the "Actions" tab - the next run catches up on all stale projects, as SonarQube Cloud deletes projects only after one year without analysis.

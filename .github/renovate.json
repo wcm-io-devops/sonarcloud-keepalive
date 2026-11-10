@@ -5,5 +5,14 @@
     ":semanticCommitsDisabled",
     "helpers:pinGitHubActionDigests"
   ],
-  "labels": ["dependencies"]
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Automerge non-major GitHub Actions updates - keeps the repository active, so GitHub does not disable the scheduled workflow. There are no status checks in this repository.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pinDigest"],
+      "automerge": true,
+      "ignoreTests": true
+    }
+  ]
 }
