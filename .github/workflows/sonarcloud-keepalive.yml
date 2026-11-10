@@ -49,6 +49,14 @@ jobs:
           - wcm-io-caravan
           - wcm-io-frontend
           - wcm-io-qa
+          - adaptto
+          - adaptto-live
+        # organizations using a different build workflow than env.WORKFLOW_FILE
+        include:
+          - org: adaptto
+            workflow-file: build.yaml
+          - org: adaptto-live
+            workflow-file: build.yml
 
     steps:
       - name: Checkout code
@@ -74,10 +82,11 @@ jobs:
           INPUT_MAX_AGE_DAYS: ${{ inputs.max-age-days || env.MAX_AGE_DAYS }}
           INPUT_DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
           INPUT_REPOSITORY: ${{ inputs.repository }}
+          INPUT_WORKFLOW_FILE: ${{ matrix.workflow-file || env.WORKFLOW_FILE }}
         run: >-
           python3 scripts/sonarcloud_keepalive.py
           --org "${{ matrix.org }}"
           --max-age-days "$INPUT_MAX_AGE_DAYS"
-          --workflow-file "$WORKFLOW_FILE"
+          --workflow-file "$INPUT_WORKFLOW_FILE"
           $INPUT_DRY_RUN
           ${INPUT_REPOSITORY:+--repo "$INPUT_REPOSITORY"}
