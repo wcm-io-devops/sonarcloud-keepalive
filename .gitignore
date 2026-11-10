@@ -10,6 +10,8 @@ infinitest.filters
 node_modules/
 npm-debug.log
 
+__pycache__/
+
 .nodejs
 .project
 .classpath
