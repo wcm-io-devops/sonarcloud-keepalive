@@ -1,2 +1,58 @@
-<img src="https://wcm.io/images/favicon-16@2x.png"/> wcm-io-maintenance
+<img src="https://wcm.io/images/favicon-16@2x.png"/> sonarcloud-keepalive
 ======
+
+Keeps the SonarQube Cloud projects of all wcm.io GitHub organizations alive by triggering regular builds for repositories that have not been analyzed recently.
+
+SonarQube Cloud [deletes projects on the free plan that have not been analyzed for one year](https://docs.sonarsource.com/sonarqube-cloud/managing-your-projects/project-data-lifecycle). Because wcm.io is very modular, some libraries get no commits for more than a year and would lose their SonarQube Cloud project, even though they are still in use.
+
+The [SonarQube Cloud Keepalive](.github/workflows/sonarcloud-keepalive.yml) workflow runs weekly. For each configured GitHub organization, it:
+
+1. Lists all repositories and ignores archived or disabled ones.
+2. Keeps only repositories with a SonarQube Cloud project. The GitHub organization must match the SonarQube Cloud organization, and the project key must be `<org>_<repo>`.
+3. Checks the date of the last analysis of the project's main branch.
+4. If that analysis is older than 30 days and there was no run of the `maven-build.yml` workflow on the default branch in the last 30 days, triggers the regular `maven-build.yml` workflow on the repository's default branch through `workflow_dispatch`. The build then runs the SonarQube Cloud analysis as usual. Other branches are never built.
+
+If an analysis is outdated but there was a recent build on the default branch, no new build is triggered and a warning is reported instead, because the build is most likely broken. The result for each organization is shown in the job summary of the workflow run.
+
+
+Configuration
+-------------
+
+Edit [sonarcloud-keepalive.yml](.github/workflows/sonarcloud-keepalive.yml) to change:
+
+* `matrix.org`: the GitHub organizations to check
+* `env.MAX_AGE_DAYS`: the maximum age of the last analysis or build, in days (default: 30)
+* `env.WORKFLOW_FILE`: the build workflow to trigger in each repository (default: `maven-build.yml`)
+* `on.schedule`: when the check runs (default: every Monday)
+
+To check the current state without triggering builds, start the workflow manually with "Dry run" enabled (the default for manual runs).
+
+
+GitHub App setup
+----------------
+
+Triggering workflows in other repositories across several organizations needs a GitHub App:
+
+1. Create a GitHub App, for example "wcm.io SonarCloud Keepalive" in the `wcm-io-devops` organization:
+   * Webhook: disabled
+   * Repository permissions: **Actions: Read and write**, **Metadata: Read-only**
+   * Where can this GitHub App be installed: **Any account**. This is required to install the app in several organizations. Only holders of the private key can create tokens.
+2. Generate a private key for the app.
+3. Install the app in all configured organizations, with access to all repositories.
+4. In this repository, configure:
+   * Variable `SONARCLOUD_KEEPALIVE_APP_CLIENT_ID`: the client ID of the app
+   * Secret `SONARCLOUD_KEEPALIVE_APP_PRIVATE_KEY`: the private key of the app
+
+
+Running locally
+---------------
+
+```
+GITHUB_TOKEN=<token> python3 scripts/sonarcloud_keepalive.py --org wcm-io --dry-run
+```
+
+
+Note on scheduled workflows
+---------------------------
+
+GitHub disables scheduled workflows in public repositories with no repository activity for 60 days, and sends a notification beforehand. Renovate keeps this repository's action versions up to date, so merging its pull requests also keeps the repository active. If the workflow gets disabled anyway, re-enable it in the "Actions" tab.
