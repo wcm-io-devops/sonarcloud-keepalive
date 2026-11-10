@@ -47,7 +47,7 @@ Triggering workflows in other repositories across several organizations needs a 
    * Repository permissions: **Actions: Read and write**, **Metadata: Read-only**, all others: no access
    * Where can this GitHub App be installed: **Any account**. This is required to install the app in several organizations. Only holders of the private key can create tokens.
 2. In the app settings, note the **Client ID** and generate a private key (downloads a `.pem` file).
-3. Install the app in all configured organizations, with access to all repositories (app settings → Install App; owners of other organizations can use `https://github.com/apps/<app-slug>/installations/new`).
+3. Install the app in all configured organizations, with access to all repositories (app settings → Install App; owners of other organizations can use [https://github.com/apps/wcm-io-sonarcloud-keepalive](https://github.com/apps/wcm-io-sonarcloud-keepalive)).
 4. In this repository (Settings → Secrets and variables → Actions), configure:
    * Variable `SONARCLOUD_KEEPALIVE_APP_CLIENT_ID`: the client ID of the app
    * Secret `SONARCLOUD_KEEPALIVE_APP_PRIVATE_KEY`: the full content of the `.pem` file
