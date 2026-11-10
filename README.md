@@ -5,7 +5,7 @@ Keeps the SonarQube Cloud projects of all wcm.io GitHub organizations alive by t
 
 SonarQube Cloud [deletes projects on the free plan that have not been analyzed for one year](https://docs.sonarsource.com/sonarqube-cloud/managing-your-projects/project-data-lifecycle). Because wcm.io is very modular, some libraries get no commits for more than a year and would lose their SonarQube Cloud project, even though they are still in use.
 
-The [SonarQube Cloud Keepalive](.github/workflows/sonarcloud-keepalive.yml) workflow runs weekly. For each configured GitHub organization, it:
+The [SonarQube Cloud Keepalive](.github/workflows/sonarcloud-keepalive.yml) workflow runs monthly. For each configured GitHub organization, it:
 
 1. Lists all repositories and ignores archived or disabled ones.
 2. Keeps only repositories with a SonarQube Cloud project. The GitHub organization must match the SonarQube Cloud organization, and the project key must be `<org>_<repo>`.
@@ -23,7 +23,7 @@ Edit [sonarcloud-keepalive.yml](.github/workflows/sonarcloud-keepalive.yml) to c
 * `matrix.org`: the GitHub organizations to check
 * `env.MAX_AGE_DAYS`: the maximum age of the last analysis or build, in days (default: 30)
 * `env.WORKFLOW_FILE`: the build workflow to trigger in each repository (default: `maven-build.yml`)
-* `on.schedule`: when the check runs (default: every Monday)
+* `on.schedule`: when the check runs (default: 1st day of every month)
 
 To check the current state without triggering builds, start the workflow manually with "Dry run" enabled (the default for manual runs).
 
