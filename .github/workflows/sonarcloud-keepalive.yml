@@ -17,6 +17,12 @@ on:
         description: Trigger a build if there was no analysis/build within this number of days
         type: number
         default: 30
+      repository:
+        description: >-
+          Optional: only trigger the build of this repository (<org>/<repo>),
+          regardless of last analysis and recent builds
+        type: string
+        default: ''
 
 concurrency: ${{ github.workflow }}
 
@@ -46,9 +52,11 @@ jobs:
 
     steps:
       - name: Checkout code
+        if: ${{ !inputs.repository || startsWith(inputs.repository, format('{0}/', matrix.org)) }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Create GitHub App token
+        if: ${{ !inputs.repository || startsWith(inputs.repository, format('{0}/', matrix.org)) }}
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
@@ -59,13 +67,16 @@ jobs:
           permission-metadata: read
 
       - name: Trigger builds for stale SonarQube Cloud projects
+        if: ${{ !inputs.repository || startsWith(inputs.repository, format('{0}/', matrix.org)) }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           INPUT_MAX_AGE_DAYS: ${{ inputs.max-age-days || env.MAX_AGE_DAYS }}
           INPUT_DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+          INPUT_REPOSITORY: ${{ inputs.repository }}
         run: >-
           python3 scripts/sonarcloud_keepalive.py
           --org "${{ matrix.org }}"
           --max-age-days "$INPUT_MAX_AGE_DAYS"
           --workflow-file "$WORKFLOW_FILE"
           $INPUT_DRY_RUN
+          ${INPUT_REPOSITORY:+--repo "$INPUT_REPOSITORY"}

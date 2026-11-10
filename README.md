@@ -27,6 +27,8 @@ Edit [sonarcloud-keepalive.yml](.github/workflows/sonarcloud-keepalive.yml) to c
 
 To check the current state without triggering builds, start the workflow manually with "Dry run" enabled (the default for manual runs).
 
+To trigger the build of a single repository regardless of its last analysis and recent builds (e.g. to test the setup), start the workflow manually with "Repository" set to `<org>/<repo>` and "Dry run" disabled. The organization has to be one of the configured organizations; all other organizations are skipped.
+
 
 GitHub App setup
 ----------------
@@ -49,6 +51,7 @@ Running locally
 
 ```
 GITHUB_TOKEN=<token> python3 scripts/sonarcloud_keepalive.py --org wcm-io --dry-run
+GITHUB_TOKEN=<token> python3 scripts/sonarcloud_keepalive.py --org wcm-io --repo wcm-io/<repo> --dry-run
 ```
 
 

@@ -143,15 +143,17 @@ class Result:
     level: str = "info"  # info | warning | error
 
 
-def process_repo(github, org, repo, sonar_key, workflow_file, cutoff, dry_run):
+def process_repo(github, org, repo, sonar_key, workflow_file, cutoff, dry_run, force=False):
+    """Checks a repository and triggers its build if required.
+    With force=True, the build is triggered regardless of last analysis and recent builds."""
     name = repo["name"]
     default_branch = repo["default_branch"]
-    sonar_branch, last_analysis = get_sonar_main_branch(sonar_key)
+    sonar_branch, last_analysis = get_sonar_main_branch(sonar_key) if sonar_key else (None, None)
 
     def result(action, level="info"):
         return Result(name, default_branch, sonar_branch, last_analysis, action, level)
 
-    if last_analysis and last_analysis >= cutoff:
+    if not force and last_analysis and last_analysis >= cutoff:
         return result("up to date")
 
     if sonar_branch and sonar_branch != default_branch:
@@ -169,38 +171,48 @@ def process_repo(github, org, repo, sonar_key, workflow_file, cutoff, dry_run):
 
     # a recent build on the default branch that did not lead to an analysis is most likely broken -
     # report it instead of re-triggering it on every run
-    runs = github.get(
-        f"/repos/{org}/{name}/actions/workflows/{workflow_file}/runs",
-        {
-            "branch": default_branch,
-            "exclude_pull_requests": "true",
-            "created": f">={cutoff.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-            "per_page": 1,
-        })
-    if runs["total_count"] > 0:
-        run = runs["workflow_runs"][0]
-        state = run["conclusion"] or run["status"]
-        return result(f"skipped: recent build without analysis ({state}, "
-                      f"{format_date(parse_date(run['created_at']))}): {run['html_url']}", "warning")
+    if not force:
+        runs = github.get(
+            f"/repos/{org}/{name}/actions/workflows/{workflow_file}/runs",
+            {
+                "branch": default_branch,
+                "exclude_pull_requests": "true",
+                "created": f">={cutoff.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                "per_page": 1,
+            })
+        if runs["total_count"] > 0:
+            run = runs["workflow_runs"][0]
+            state = run["conclusion"] or run["status"]
+            return result(f"skipped: recent build without analysis ({state}, "
+                          f"{format_date(parse_date(run['created_at']))}): {run['html_url']}", "warning")
 
+    forced = " (forced)" if force else ""
     if dry_run:
-        return result(f"would trigger {workflow_file} on {default_branch} (dry run)")
+        return result(f"would trigger {workflow_file} on {default_branch}{forced} (dry run)")
     github.post(f"/repos/{org}/{name}/actions/workflows/{workflow_file}/dispatches",
                 {"ref": default_branch})
-    return result(f"triggered {workflow_file} on {default_branch}")
+    return result(f"triggered {workflow_file} on {default_branch}{forced}")
 
 
-def write_summary(org, results, without_sonar_count, archived_count, max_age_days, dry_run):
+def write_summary(org, results, without_sonar_count, archived_count, max_age_days, dry_run, single_repo=False):
     lines = [
         f"## SonarQube Cloud keepalive: {org}",
         "",
-        f"Max. age of last analysis: {max_age_days} days" + (" (**dry run**)" if dry_run else ""),
-        "",
-        f"- Repositories with SonarQube Cloud project: {len(results)}",
-        f"- Archived/disabled repositories (ignored): {archived_count}",
-        f"- Repositories without SonarQube Cloud project (ignored): {without_sonar_count}",
-        "",
     ]
+    if single_repo:
+        lines += [
+            "Forced build of a single repository" + (" (**dry run**)" if dry_run else ""),
+            "",
+        ]
+    else:
+        lines += [
+            f"Max. age of last analysis: {max_age_days} days" + (" (**dry run**)" if dry_run else ""),
+            "",
+            f"- Repositories with SonarQube Cloud project: {len(results)}",
+            f"- Archived/disabled repositories (ignored): {archived_count}",
+            f"- Repositories without SonarQube Cloud project (ignored): {without_sonar_count}",
+            "",
+        ]
     if results:
         icons = {"info": "", "warning": "⚠️ ", "error": "❌ "}
         lines += ["| Repository | Default branch | Last analysis | Action |",
@@ -218,6 +230,38 @@ def write_summary(org, results, without_sonar_count, archived_count, max_age_day
     print(summary)
 
 
+def force_repo(github, org, repo_name, workflow_file, cutoff, max_age_days, dry_run):
+    """Triggers the build of a single repository, regardless of last analysis and recent builds."""
+    if "/" in repo_name:
+        repo_org, repo_name = repo_name.split("/", 1)
+        if repo_org.lower() != org.lower():
+            sys.exit(f"Repository '{repo_org}/{repo_name}' does not belong to organization '{org}'")
+    try:
+        repo = github.get(f"/repos/{org}/{repo_name}")
+    except HttpError as e:
+        if e.status == 404:
+            sys.exit(f"Repository '{org}/{repo_name}' not found")
+        raise
+    if repo.get("archived") or repo.get("disabled"):
+        sys.exit(f"Repository '{org}/{repo_name}' is archived or disabled")
+
+    sonar_keys = list_sonar_project_keys(org) or {}
+    sonar_key = sonar_keys.get(f"{org}_{repo['name']}".lower())
+    if not sonar_key:
+        print(f"::warning::{org}/{repo['name']}: no SonarQube Cloud project found")
+
+    try:
+        result = process_repo(github, org, repo, sonar_key, workflow_file, cutoff, dry_run, force=True)
+    except Exception as e:  # noqa: BLE001 - report in summary
+        result = Result(repo["name"], repo["default_branch"], None, None, f"error: {e}", "error")
+    if result.level != "info":
+        print(f"::{result.level}::{org}/{result.repo}: {result.action}")
+
+    write_summary(org, [result], 0, 0, max_age_days, dry_run, single_repo=True)
+    if result.level != "info":
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--org", required=True, help="GitHub organization (= SonarQube Cloud organization)")
@@ -226,6 +270,9 @@ def main():
     parser.add_argument("--workflow-file", default="maven-build.yml",
                         help="File name of the build workflow to dispatch in each repository")
     parser.add_argument("--dry-run", action="store_true", help="Only report, do not trigger any builds")
+    parser.add_argument("--repo",
+                        help="Only process this repository of the organization (name or <org>/<name>) and "
+                             "trigger its build regardless of last analysis and recent builds")
     args = parser.parse_args()
 
     token = os.environ.get("GITHUB_TOKEN")
@@ -234,6 +281,10 @@ def main():
     github = GitHub(token)
     org = args.org
     cutoff = datetime.now(timezone.utc) - timedelta(days=args.max_age_days)
+
+    if args.repo:
+        force_repo(github, org, args.repo, args.workflow_file, cutoff, args.max_age_days, args.dry_run)
+        return
 
     sonar_keys = list_sonar_project_keys(org)
     if sonar_keys is None:
