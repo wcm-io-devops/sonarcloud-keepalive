@@ -70,6 +70,7 @@ jobs:
         if: ${{ !inputs.repository || startsWith(inputs.repository, format('{0}/', matrix.org)) }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          # inputs are only set for manual runs - scheduled runs use the defaults from env and never run in dry run mode
           INPUT_MAX_AGE_DAYS: ${{ inputs.max-age-days || env.MAX_AGE_DAYS }}
           INPUT_DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
           INPUT_REPOSITORY: ${{ inputs.repository }}
