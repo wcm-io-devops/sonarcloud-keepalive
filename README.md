@@ -35,15 +35,24 @@ GitHub App setup
 
 Triggering workflows in other repositories across several organizations needs a GitHub App:
 
-1. Create a GitHub App, for example "wcm.io SonarCloud Keepalive" in the `wcm-io-devops` organization:
-   * Webhook: disabled
-   * Repository permissions: **Actions: Read and write**, **Metadata: Read-only**
+1. Create a GitHub App, for example "wcm.io SonarCloud Keepalive" in the `wcm-io-devops` organization (Organization settings → Developer settings → GitHub Apps → New GitHub App, or directly via https://github.com/organizations/wcm-io-devops/settings/apps/new):
+   * Description (shown on the app page and when installing it):
+     ```
+     Keeps SonarQube Cloud projects of rarely changed wcm.io repositories alive by triggering their regular build workflow (`maven-build.yml`) when there was no analysis in the last 30 days.
+
+     Used only by the scheduled workflow in https://github.com/wcm-io-devops/sonarcloud-keepalive. Permissions: Actions (read/write) to start the build workflow, Metadata (read-only).
+     ```
+   * Homepage URL: `https://github.com/wcm-io-devops/sonarcloud-keepalive`
+   * Webhook: disabled (uncheck "Active")
+   * Repository permissions: **Actions: Read and write**, **Metadata: Read-only**, all others: no access
    * Where can this GitHub App be installed: **Any account**. This is required to install the app in several organizations. Only holders of the private key can create tokens.
-2. Generate a private key for the app.
-3. Install the app in all configured organizations, with access to all repositories.
-4. In this repository, configure:
+2. In the app settings, note the **Client ID** and generate a private key (downloads a `.pem` file).
+3. Install the app in all configured organizations, with access to all repositories (app settings → Install App; owners of other organizations can use `https://github.com/apps/<app-slug>/installations/new`).
+4. In this repository (Settings → Secrets and variables → Actions), configure:
    * Variable `SONARCLOUD_KEEPALIVE_APP_CLIENT_ID`: the client ID of the app
-   * Secret `SONARCLOUD_KEEPALIVE_APP_PRIVATE_KEY`: the private key of the app
+   * Secret `SONARCLOUD_KEEPALIVE_APP_PRIVATE_KEY`: the full content of the `.pem` file
+
+   Delete the local `.pem` file afterwards.
 
 
 Running locally
